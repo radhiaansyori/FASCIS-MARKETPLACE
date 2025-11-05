@@ -1,0 +1,17 @@
+# 1. Clone repo kosong (baru dibuat)
+git clone https://github.com/USERNAME/fascis-marketplace.git
+cd fascis-marketplace
+
+# 2. Buat folder frontend dan backend
+mkdir frontend backend
+
+# 1. Clone repo kosong (baru dibuat)
+git clone https://github.com/USERNAME/fascis-marketplace.git
+cd fascis-marketplace
+
+# 2. Buat folder frontend dan backend
+mkdir frontend backend
+
+git add .
+git commit -m "Initial commit: fascis marketplace full project"
+git push origin main
