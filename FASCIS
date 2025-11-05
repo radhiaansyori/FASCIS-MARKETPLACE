@@ -222,3 +222,16 @@ cd frontend
 npm install
 npm start
 
+cd fascis-marketplace/backend
+npm install
+node server.js
+npm install -g nodemon
+nodemon server.js
+http://localhost:5000/api/payment
+
+cd fascis-marketplace/frontend
+npm install
+npm start
+http://localhost:3000
+
+
