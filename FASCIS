@@ -1,17 +1,224 @@
-# 1. Clone repo kosong (baru dibuat)
-git clone https://github.com/USERNAME/fascis-marketplace.git
-cd fascis-marketplace
+fascis-marketplace/
+├─ frontend/
+│  ├─ src/
+│  │  ├─ components/
+│  │  │  ├─ Navbar.js
+│  │  │  ├─ ProductCard.js
+│  │  │  ├─ FilterSidebar.js
+│  │  ├─ context/
+│  │  │  └─ CartContext.js
+│  │  ├─ pages/
+│  │  │  ├─ HomePage.js
+│  │  │  ├─ CartPage.js
+│  │  │  └─ CheckoutPage.js
+│  │  ├─ App.js
+│  │  └─ index.js
+│  └─ package.json
+├─ backend/
+│  ├─ routes/
+│  │  └─ payment.js
+│  ├─ server.js
+│  └─ package.json
+└─ README.md
 
-# 2. Buat folder frontend dan backend
-mkdir frontend backend
+{
+  "name": "fascis-backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "midtrans-client": "^1.0.3",
+    "body-parser": "^1.20.2"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const paymentRoute = require("./routes/payment");
 
-# 1. Clone repo kosong (baru dibuat)
-git clone https://github.com/USERNAME/fascis-marketplace.git
-cd fascis-marketplace
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
 
-# 2. Buat folder frontend dan backend
-mkdir frontend backend
+app.use("/api/payment", paymentRoute);
 
-git add .
-git commit -m "Initial commit: fascis marketplace full project"
-git push origin main
+app.listen(5000, () => console.log("Backend running on http://localhost:5000"));
+
+const express = require("express");
+const router = express.Router();
+const midtransClient = require("midtrans-client");
+
+// gunakan sandbox Midtrans
+const snap = new midtransClient.Snap({
+  isProduction: false,
+  serverKey: "YOUR_SERVER_KEY", // ganti dengan sandbox server key
+  clientKey: "YOUR_CLIENT_KEY"
+});
+
+router.post("/", async (req, res) => {
+  const { cart, total, customer } = req.body;
+  const parameter = {
+    transaction_details: {
+      order_id: `FASCIS-${Date.now()}`,
+      gross_amount: total
+    },
+    customer_details: {
+      first_name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      shipping_address: { address: customer.address }
+    },
+    credit_card: { secure: true }
+  };
+
+  try {
+    const transaction = await snap.createTransaction(parameter);
+    res.json({ token: transaction.token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Payment error");
+  }
+});
+
+module.exports = router;
+
+{
+  "name": "fascis-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "axios": "^1.5.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.15.0",
+    "react-scripts": "5.0.1"
+  },
+  "scripts": {
+    "start": "react-scripts start"
+  }
+}
+import React, { createContext, useState } from "react";
+
+export const CartContext = createContext();
+
+export const CartProvider = ({ children }) => {
+  const [cart, setCart] = useState([]);
+
+  const addToCart = (product) => {
+    const exists = cart.find(item => item.id === product.id);
+    if (exists) {
+      setCart(cart.map(item => item.id === product.id ? { ...item, quantity: item.quantity+1 } : item));
+    } else {
+      setCart([...cart, { ...product, quantity: 1 }]);
+    }
+  };
+
+  const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
+  const updateQuantity = (id, qty) => setCart(cart.map(item => item.id === id ? { ...item, quantity: qty } : item));
+  const clearCart = () => setCart([]);
+
+  return (
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart }}>
+      {children}
+    </CartContext.Provider>
+  );
+};
+import React, { useContext } from "react";
+import { CartContext } from "../context/CartContext";
+
+const dummyProducts = [
+  { id: 1, name: "Smartphone A", price: 2500000 },
+  { id: 2, name: "Smartphone B", price: 3000000 },
+  { id: 3, name: "Laptop X", price: 7500000 },
+  { id: 4, name: "Headphone Z", price: 500000 }
+];
+
+export default function HomePage() {
+  const { addToCart } = useContext(CartContext);
+  return (
+    <div style={{ padding: "30px" }}>
+      <h2>FASCIS Marketplace</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "20px" }}>
+        {dummyProducts.map(p => (
+          <div key={p.id} style={{ border: "1px solid #ddd", borderRadius: "10px", padding: "20px" }}>
+            <h4>{p.name}</h4>
+            <p>Rp {p.price.toLocaleString()}</p>
+            <button onClick={() => addToCart(p)} style={{ padding: "10px 20px", backgroundColor: "#007bff", color: "#fff", border: "none", borderRadius: "8px" }}>
+              Tambah ke Keranjang
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+import React, { useContext, useState } from "react";
+import { CartContext } from "../context/CartContext";
+import axios from "axios";
+
+export default function CheckoutPage() {
+  const { cart, clearCart } = useContext(CartContext);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "" });
+  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handlePayment = async () => {
+    try {
+      const res = await axios.post("http://localhost:5000/api/payment", { cart, total, customer: form });
+      window.snap.pay(res.data.token, {
+        onSuccess: () => { clearCart(); alert("Pembayaran sukses!"); },
+        onPending: () => alert("Pembayaran pending"),
+        onError: () => alert("Terjadi error")
+      });
+    } catch (err) { console.error(err); }
+  };
+
+  return (
+    <div style={{ padding: "30px" }}>
+      <h2>Checkout</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <input type="text" name="name" placeholder="Nama" value={form.name} onChange={handleChange} />
+        <input type="email" name="email" placeholder="Email" value={form.email} onChange={handleChange} />
+        <input type="text" name="phone" placeholder="No HP" value={form.phone} onChange={handleChange} />
+        <textarea name="address" placeholder="Alamat" value={form.address} onChange={handleChange} />
+        <h3>Total: Rp {total.toLocaleString()}</h3>
+        <button onClick={handlePayment} style={{ padding: "10px", backgroundColor: "#28a745", color: "#fff", border: "none", borderRadius: "10px" }}>
+          Bayar Sekarang
+        </button>
+      </div>
+    </div>
+  );
+}
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { CartProvider } from "./context/CartContext";
+import HomePage from "./pages/HomePage";
+import CheckoutPage from "./pages/CheckoutPage";
+
+function App() {
+  return (
+    <CartProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+        </Routes>
+      </Router>
+    </CartProvider>
+  );
+}
+
+export default App;
+
+cd backend
+npm install
+node server.js
+cd frontend
+npm install
+npm start
+
